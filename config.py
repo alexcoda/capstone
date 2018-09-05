@@ -3,8 +3,9 @@ import torch
 import gym
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# env_name = 'Pong-v0'
 env_name = 'CartPole-v0'
-env = gym.make('CartPole-v0').unwrapped
+env = gym.make(env_name).unwrapped
 
 N_EPISODES = 50
 BATCH_SIZE = 128
@@ -17,6 +18,7 @@ TARGET_UPDATE = 10
 
 config = {'device': device,
           'env': env,
+          'env_name': env_name,
           'N_EPISODES': N_EPISODES,
           'BATCH_SIZE': BATCH_SIZE,
           'GAMMA': GAMMA,

@@ -4,51 +4,38 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from PIL import Image
+import preprocess
 
 resize = T.Compose([T.ToPILImage(),
                     T.Resize(40, interpolation=Image.CUBIC),
                     T.ToTensor()])
 
-# This is based on the code from gym.
-screen_width = 600
 
-
-def show_example_screen(env, device):
+def show_example_screen(config):
     plt.figure()
-    plt.imshow(get_screen(env, device).cpu().squeeze(0).permute(1, 2, 0).numpy(),
+    plt.imshow(get_screen(config).cpu().squeeze(0).permute(1, 2, 0).numpy(),
                interpolation='none')
     plt.title('Example extracted screen')
     plt.show()
 
 
-def get_cart_location(env):
-    world_width = env.x_threshold * 2
-    scale = screen_width / world_width
-    return int(env.state[0] * scale + screen_width / 2.0)  # MIDDLE OF CART
-
-
-def get_screen(env, device):
-    screen = env.render(mode='rgb_array').transpose(
-        (2, 0, 1))  # transpose into torch order (CHW)
+def get_screen(config):
+    env = config['env']
+    device = config['device']
+    env_name = config['env_name']
     # Strip off the top and bottom of the screen
-    screen = screen[:, 160:320]
-    view_width = 320
-    cart_location = get_cart_location(env)
-    if cart_location < view_width // 2:
-        slice_range = slice(view_width)
-    elif cart_location > (screen_width - view_width // 2):
-        slice_range = slice(-view_width, None)
+    if env_name=='Pong-v0':
+        screen = env.render(mode='rgb_array')
+        screen = preprocess.prepro_pong(screen)
     else:
-        slice_range = slice(cart_location - view_width // 2,
-                            cart_location + view_width // 2)
-    # Strip off the edges, so that we have a square image centered on a cart
-    screen = screen[:, :, slice_range]
-    # Convert to float, rescare, convert to torch tensor
-    # (this doesn't require a copy)
-    screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
-    screen = torch.from_numpy(screen)
+        screen = env.render(mode='rgb_array').transpose(
+        (2, 0, 1))  # transpose into torch order (CHW)
+        screen = preprocess.prepro_cartpole(screen, env)
+    # screen = torch.from_numpy(screen)
+    print(type(screen), resize(screen).shape)
     # Resize, and add a batch dimension (BCHW)
-    return resize(screen).unsqueeze(0).to(device)
+    screen = resize(screen).unsqueeze(0).to(device)
+    return screen
 
 
 def plot_durations(episode_durations):

@@ -8,6 +8,7 @@ from utils import get_logger
 from agent import DQNAgent
 from config import config
 from train import train
+import time
 
 
 def main():
@@ -20,15 +21,15 @@ def main():
 
     # Show an example screen
     print('Showing example screen.')
-    show_example_screen(env, device)
+    show_example_screen(config)
+    time.sleep(5)
+    # # Setup the agent
+    # print('Setting up the agent.')
+    # agent = DQNAgent(config)
 
-    # Setup the agent
-    print('Setting up the agent.')
-    agent = DQNAgent(config)
-
-    # Run the training loop
-    print('Training.')
-    train(agent, config)
+    # # Run the training loop
+    # print('Training.')
+    # train(agent, config)
 
 
 if __name__ == "__main__":
