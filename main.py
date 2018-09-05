@@ -4,12 +4,15 @@ import matplotlib.pyplot as plt
 
 # Local imports
 from vis import show_example_screen
+from utils import get_logger
 from agent import DQNAgent
 from config import config
 from train import train
 
 
 def main():
+    logger = get_logger(__name__, 4)
+
     env = config['env']
     device = config['device']
     plt.ion()
