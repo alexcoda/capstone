@@ -20,9 +20,13 @@ def train(agent, config):
         print(i_episode)
         # Initialize the environment and state
         env.reset()
-        last_screen = get_screen(env, device)
-        current_screen = get_screen(env, device)
+        last_screen = get_screen(config)
+        current_screen = get_screen(config)
         state = current_screen - last_screen
+        print("STATE SHAPE")
+        print (state.shape)
+        # s = input()
+
         for t in count():
             # Select and perform an action
             action = agent.select_action(state)
@@ -31,7 +35,7 @@ def train(agent, config):
 
             # Observe new state
             last_screen = current_screen
-            current_screen = get_screen(env, device)
+            current_screen = get_screen(config)
             if not done:
                 next_state = current_screen - last_screen
             else:

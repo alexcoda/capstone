@@ -25,14 +25,15 @@ def get_screen(config):
     env_name = config['env_name']
     # Strip off the top and bottom of the screen
     if env_name=='Pong-v0':
-        screen = env.render(mode='rgb_array')
+        screen = env.reset()#mode='rgb_array')#.transpose((2, 0, 1))
         screen = preprocess.prepro_pong(screen)
+        env.render()
     else:
         screen = env.render(mode='rgb_array').transpose(
         (2, 0, 1))  # transpose into torch order (CHW)
         screen = preprocess.prepro_cartpole(screen, env)
-    # screen = torch.from_numpy(screen)
-    print(type(screen), resize(screen).shape)
+    screen = torch.from_numpy(screen)
+    # print(type(screen), resize(screen).shape)
     # Resize, and add a batch dimension (BCHW)
     screen = resize(screen).unsqueeze(0).to(device)
     return screen

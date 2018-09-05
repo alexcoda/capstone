@@ -11,7 +11,7 @@ def prepro_pong(I):
     I[I == 144] = 0 # erase background (background type 1)
     I[I == 109] = 0 # erase background (background type 2)
     I[I != 0] = 1 # everything else (paddles, ball) just set to 1
-    I = I.permute(2,0,1)
+    I = I.transpose(2,0,1)
     return np.ascontiguousarray(I, dtype=np.float32) / 255
 
 def get_cart_location(env):
