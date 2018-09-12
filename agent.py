@@ -50,8 +50,8 @@ class DQNAgent:
         self.GAMMA = config['GAMMA']
 
         # Set up our networks
-        self.policy_net = DQN().to(self.device)
-        self.target_net = DQN().to(self.device)
+        self.policy_net = DQN(config).to(self.device)
+        self.target_net = DQN(config).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
