@@ -14,6 +14,7 @@ def train(agent, params):
     device = params.device
     n_episodes = params.n_episodes
     target_update_freq = params.target_update_freq
+    action_frame_freq = params.action_frame_freq
 
     episode_durations = []
 
@@ -24,10 +25,15 @@ def train(agent, params):
         last_screen = get_screen(env, device)
         current_screen = get_screen(env, device)
         state = current_screen - last_screen
+
+        # Execute the current episode
         for t in count():
-            # Select and perform an action
-            action = agent.select_action(state)
-            temp_state, reward, done, _ = env.step(action.item())
+            # Select the next action
+            if t % action_frame_freq == 0:
+                action = agent.select_action(state)
+                print(f"new action: {action}")
+            # Perform the action
+            _, reward, done, _ = env.step(action.item())
             reward = torch.tensor([reward], device=device)
 
             # Observe new state

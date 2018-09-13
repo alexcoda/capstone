@@ -15,7 +15,6 @@ def main():
 
     env = params.env
     device = params.device
-    # plt.ion()
     env.reset()
 
     # Show an example screen
