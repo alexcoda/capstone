@@ -39,19 +39,19 @@ class ReplayMemory(object):
 
 class DQNAgent:
 
-    def __init__(self, config):
-        self.config = config
-        self.env = config['env']
-        self.device = config['device']
-        self.EPS_END = config['EPS_END']
-        self.EPS_START = config['EPS_START']
-        self.EPS_DECAY = config['EPS_DECAY']
-        self.BATCH_SIZE = config['BATCH_SIZE']
-        self.GAMMA = config['GAMMA']
+    def __init__(self, params):
+        self.params = params
+        self.env = params.env
+        self.device = params.device
+        self.eps_end = params.eps_end
+        self.eps_start = params.eps_start
+        self.eps_decay = params.eps_decay
+        self.batch_size = params.batch_size
+        self.gamma = params.gamma
 
         # Set up our networks
-        self.policy_net = DQN(config).to(self.device)
-        self.target_net = DQN(config).to(self.device)
+        self.policy_net = DQN(params).to(self.device)
+        self.target_net = DQN(params).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
@@ -59,15 +59,12 @@ class DQNAgent:
         self.memory = ReplayMemory(10000)
 
         self.steps_done = 0
-        # Add config params
-        # Add method for selecting actions
-        # Add method for optiomizing the model
 
     def select_action(self, state):
         """Select an action given the state according to the current policy."""
         sample = random.random()
-        eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * \
-            math.exp(-1. * self.steps_done / self.EPS_DECAY)
+        eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * \
+            math.exp(-1. * self.steps_done / self.eps_decay)
         self.steps_done += 1
         if sample > eps_threshold:
             with torch.no_grad():
@@ -78,9 +75,9 @@ class DQNAgent:
 
     def step(self):
         """Take a single step in optimizing the model."""
-        if len(self.memory) < self.BATCH_SIZE:
+        if len(self.memory) < self.batch_size:
             return  # Memory has too few instances
-        transitions = self.memory.sample(self.BATCH_SIZE)
+        transitions = self.memory.sample(self.batch_size)
         # Transpose the batch
         batch = Transition(*zip(*transitions))
 
@@ -99,12 +96,12 @@ class DQNAgent:
         state_action_values = self.policy_net(state_batch).gather(1, action_batch)
 
         # Compute V(s_{t+1}) for all next states.
-        next_state_values = torch.zeros(self.BATCH_SIZE, device=self.device)
+        next_state_values = torch.zeros(self.batch_size, device=self.device)
         next_state_values[non_final_mask] = \
             self.target_net(non_final_next_states).max(1)[0].detach()
         # Compute the expected Q values
         expected_state_action_values = \
-            (next_state_values * self.GAMMA) + reward_batch
+            (next_state_values * self.gamma) + reward_batch
 
         # Compute Huber loss
         loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))

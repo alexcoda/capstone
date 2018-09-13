@@ -6,32 +6,32 @@ import matplotlib.pyplot as plt
 from vis import show_example_screen
 from utils import get_logger
 from agent import DQNAgent
-from config import config
+from config import params
 from train import train
 
 
 def main():
     logger = get_logger(__name__, 4)
 
-    env = config['env']
-    device = config['device']
-    plt.ion()
+    env = params.env
+    device = params.device
+    # plt.ion()
     env.reset()
 
     # Show an example screen
-    print('Showing example screen.')
-    show_example_screen(env, device)
+    # print('Showing example screen.')
+    # show_example_screen(env, device)
 
     # Setup the agent
     print('Setting up the agent.')
-    agent = DQNAgent(config)
+    agent = DQNAgent(params)
 
     # Run the training loop
     print('Training.')
-    train(agent, config)
+    train(agent, params)
 
 
 if __name__ == "__main__":
     main()
     print('Done!')
-    config['env'].close()
+    params.env.close()

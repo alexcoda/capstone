@@ -5,11 +5,10 @@ import torch.nn.functional as F
 
 class DQN(nn.Module):
 
-    def __init__(self, config):
+    def __init__(self, params):
         super(DQN, self).__init__()
-        env = config['env']
+        env = params.env
         num_actions = env.action_space.n
-        print(num_actions)
 
         self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
         self.bn1 = nn.BatchNorm2d(16)

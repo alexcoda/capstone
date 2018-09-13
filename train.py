@@ -8,16 +8,17 @@ from itertools import count
 from vis import get_screen, plot_durations
 
 
-def train(agent, config):
-    env = config['env']
-    device = config['device']
-    N_EPISODES = config['N_EPISODES']
-    TARGET_UPDATE = config['TARGET_UPDATE']
+def train(agent, params):
+    # Unpack the params we plan to use
+    env = params.env
+    device = params.device
+    n_episodes = params.n_episodes
+    target_update_freq = params.target_update_freq
 
     episode_durations = []
 
-    for i_episode in range(N_EPISODES):
-        print(i_episode)
+    for i_episode in range(n_episodes):
+        print(f"Episode {i_episode}")
         # Initialize the environment and state
         env.reset()
         last_screen = get_screen(env, device)
@@ -26,7 +27,7 @@ def train(agent, config):
         for t in count():
             # Select and perform an action
             action = agent.select_action(state)
-            _, reward, done, _ = env.step(action.item())
+            temp_state, reward, done, _ = env.step(action.item())
             reward = torch.tensor([reward], device=device)
 
             # Observe new state
@@ -46,15 +47,18 @@ def train(agent, config):
             # Perform one step of the optimization (on the target network)
             agent.step()
             if done:
+                print(f"  Episode Duration: {t + 1}")
                 episode_durations.append(t + 1)
-                plot_durations(episode_durations)
+                if len(episode_durations) % 10 == 0:
+                    print(f"  Last 10 Avg: {sum(episode_durations[-10:]) / 10}")
+                    print(f"  Memory Size: {len(agent.memory)}")
+                    plot_durations(episode_durations)
                 break
         # Update the target network
-        if i_episode % TARGET_UPDATE == 0:
+        if i_episode % target_update_freq == 0:
             agent.target_net.load_state_dict(agent.policy_net.state_dict())
 
     print('Complete')
     env.render()
     env.close()
-    plt.ioff()
-    plt.show()
+    # plt.ioff()

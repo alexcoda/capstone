@@ -1,26 +1,33 @@
 """Parameters for running DQN experiments."""
+from dataclasses import dataclass
 import torch
 import gym
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-env_name = 'CartPole-v0'
-env = gym.make('CartPole-v0').unwrapped
 
-N_EPISODES = 50
-BATCH_SIZE = 128
-GAMMA = 0.999
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 200
-TARGET_UPDATE = 10
+@dataclass(repr=False)
+class Params:
+    n_episodes: int
+    action_frame_freq: int
+    target_update_freq: int
+    batch_size: int
+    gamma: float
+    eps_start: float
+    eps_end: float
+    eps_decay: int
+    env_name: str
 
+    def __post_init__(self):
+        # Setup for cuda and gym environment
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.env = gym.make(self.env_name).unwrapped
 
-config = {'device': device,
-          'env': env,
-          'N_EPISODES': N_EPISODES,
-          'BATCH_SIZE': BATCH_SIZE,
-          'GAMMA': GAMMA,
-          'EPS_START': EPS_START,
-          'EPS_END': EPS_END,
-          'EPS_DECAY': EPS_DECAY,
-          'TARGET_UPDATE': TARGET_UPDATE}
+params = Params(
+    n_episodes=1000,
+    action_frame_freq=1,
+    target_update_freq=1,
+    batch_size=128,
+    gamma=0.999,
+    eps_start=0.9,
+    eps_end=0.05,
+    eps_decay=200,
+    env_name='CartPole-v0')
