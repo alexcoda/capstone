@@ -5,7 +5,6 @@ screen_width = 600
 
 def prepro_pong(I):
     """ prepro 210x160x3 uint8 frame into 6400 (80x80) 1D float vector """
-    # pdb.set_trace()
     I = I[35:195] # crop
     I = I[::2,::2,:] # downsample by factor of 2
     I[I == 144] = 0 # erase background (background type 1)

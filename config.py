@@ -15,6 +15,8 @@ EPS_END = 0.05
 EPS_DECAY = 200
 TARGET_UPDATE = 10
 
+N_ACTIONS = 6 # 6 for Atari, 2 for Cartpole
+N_LINEAR = 128 #128 for atari, 448 for Cartpole
 
 config = {'device': device,
           'env': env,
@@ -25,4 +27,6 @@ config = {'device': device,
           'EPS_START': EPS_START,
           'EPS_END': EPS_END,
           'EPS_DECAY': EPS_DECAY,
-          'TARGET_UPDATE': TARGET_UPDATE}
+          'TARGET_UPDATE': TARGET_UPDATE,
+          'N_ACTIONS': N_ACTIONS,
+          'N_LINEAR': N_LINEAR}

@@ -38,8 +38,8 @@ def train(agent, config):
             env.render()
             # Select and perform an action
             action = agent.select_action(state)
-            # print(action.item(), type(action))
-            observation, reward, done, _ = env.step(action.item()+2)
+            observation, reward, done, _ = env.step(action.item())
+            print(action.item())
             reward = torch.tensor([reward], device=device)
 
             # Observe new state
