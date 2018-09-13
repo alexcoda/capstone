@@ -1,12 +1,19 @@
 """Code for training a DQN agent"""
 import matplotlib.pyplot as plt
 import torch
+import torchvision.transforms as T
+from PIL import Image
+import preprocess
 
 from itertools import count
 
 # Local imports
 from vis import get_screen, plot_durations
+import time
 
+resize = T.Compose([T.ToPILImage(),
+                    T.Resize(40, interpolation=Image.CUBIC),
+                    T.ToTensor()])
 
 def train(agent, config):
     env = config['env']
@@ -20,18 +27,28 @@ def train(agent, config):
         print(i_episode)
         # Initialize the environment and state
         env.reset()
-        last_screen = get_screen(env, device)
-        current_screen = get_screen(env, device)
+        last_screen = get_screen(config)
+        current_screen = get_screen(config)
         state = current_screen - last_screen
+        print("STATE SHAPE")
+        print (state.shape)
+        # s = input()
+
         for t in count():
+            env.render()
             # Select and perform an action
             action = agent.select_action(state)
-            _, reward, done, _ = env.step(action.item())
+            observation, reward, done, _ = env.step(action.item())
+            print(action.item())
             reward = torch.tensor([reward], device=device)
 
             # Observe new state
             last_screen = current_screen
-            current_screen = get_screen(env, device)
+            current_screen = preprocess.prepro_pong(observation)
+            current_screen = torch.from_numpy(current_screen)
+            # print(type(current_screen), resize(current_screen).shape)
+            # Resize, and add a batch dimension (BCHW)
+            current_screen = resize(current_screen).unsqueeze(0).to(device)
             if not done:
                 next_state = current_screen - last_screen
             else:
