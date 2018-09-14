@@ -15,7 +15,7 @@ EPS_END = 0.05
 EPS_DECAY = 200
 TARGET_UPDATE = 10
 
-N_ACTIONS = 6 # 6 for Atari, 2 for Cartpole
+N_ACTIONS = 2 # 6 for Atari, 2 for Cartpole
 N_LINEAR = 128 #128 for atari, 448 for Cartpole
 
 config = {'device': device,
