@@ -1,77 +1,60 @@
-"""Code for training a DQN agent"""
-import matplotlib.pyplot as plt
+from __future__ import print_function
+import argparse
 import torch
-import torchvision.transforms as T
-from PIL import Image
-import preprocess
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torchvision import datasets, transforms
+from tqdm import tqdm
+import numpy as np
+import sys 
 
-from itertools import count
+def train(model, device, train_loader, optimizer, epoch, 
+        epoch_train_loss, epoch_train_accuracy):
+    global log_interval
+    model.train()
+    pbar = tqdm(train_loader, file=sys.stdout)
+    total_loss = 0
+    batches = 0
+    accuracy = 0
+    n_examples = 0
+    correct =0 
+    for (data, target) in pbar:
+        batches += 1
+        data, target = data.to(device), target.to(device)
+        optimizer.zero_grad()
+        output = model(data)
+        pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+        correct += pred.eq(target.view_as(pred)).sum().item()
+        n_examples += target.shape[0]
+        loss = F.nll_loss(output, target)
+        pbar.set_description("Loss: %.4f"%loss.item())
+        pbar.update(1)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    epoch_train_loss.append(total_loss/batches)
+    epoch_train_accuracy.append(correct/(n_examples*1.0))
+#         if batch_idx % log_interval == 0:
+#             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+#                 epoch, batch_idx * len(data), len(train_loader.dataset),
+#                 100. * batch_idx / len(train_loader), loss.item()))
 
-# Local imports
-from vis import get_screen, plot_durations
-import time
+def test(model, device, test_loader):
+    model.eval()
+    test_loss = 0
+    correct = 0
+    n_examples = 0
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
+            pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+            correct += pred.eq(target.view_as(pred)).sum().item()
+            n_examples += target.shape[0]
 
-resize = T.Compose([T.ToPILImage(),
-                    T.Resize(40, interpolation=Image.CUBIC),
-                    T.ToTensor()])
-
-def train(agent, config):
-    env = config['env']
-    device = config['device']
-    N_EPISODES = config['N_EPISODES']
-    TARGET_UPDATE = config['TARGET_UPDATE']
-
-    episode_durations = []
-
-    for i_episode in range(N_EPISODES):
-        print(i_episode)
-        # Initialize the environment and state
-        env.reset()
-        last_screen = get_screen(config)
-        current_screen = get_screen(config)
-        state = current_screen - last_screen
-        print("STATE SHAPE")
-        print (state.shape)
-        # s = input()
-
-        for t in count():
-            env.render()
-            # Select and perform an action
-            action = agent.select_action(state)
-            observation, reward, done, _ = env.step(action.item())
-            print(action.item())
-            reward = torch.tensor([reward], device=device)
-
-            # Observe new state
-            last_screen = current_screen
-            current_screen = preprocess.prepro_pong(observation)
-            current_screen = torch.from_numpy(current_screen)
-            # print(type(current_screen), resize(current_screen).shape)
-            # Resize, and add a batch dimension (BCHW)
-            current_screen = resize(current_screen).unsqueeze(0).to(device)
-            if not done:
-                next_state = current_screen - last_screen
-            else:
-                next_state = None
-
-            # Store the transition in memory
-            agent.memory.push(state, action, next_state, reward)
-
-            # Move to the next state
-            state = next_state
-
-            # Perform one step of the optimization (on the target network)
-            agent.step()
-            if done:
-                episode_durations.append(t + 1)
-                plot_durations(episode_durations)
-                break
-        # Update the target network
-        if i_episode % TARGET_UPDATE == 0:
-            agent.target_net.load_state_dict(agent.policy_net.state_dict())
-
-    print('Complete')
-    env.render()
-    env.close()
-    plt.ioff()
-    plt.show()
+    test_loss /= n_examples
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        test_loss, correct, n_examples,
+        100. * correct / n_examples))
