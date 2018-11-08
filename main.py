@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
+from torch.utils.data.dataset import Dataset, ConcatDataset
 from tqdm import tqdm
 import numpy as np
 import sys 
@@ -38,6 +39,42 @@ def collate_fn_task2(data):
 	classes = [5,6,7,8,9]
 	return collate(data, classes)
 
+def collate_mixed_domain(data):
+	data_xy, data_domain = zip(*data)
+	data_x, data_y = zip(*data_xy)
+	final_x = torch.stack(data_x)
+	final_y = torch.stack(data_y)
+	final_domain = torch.stack(data_domain)
+
+	return (final_x, final_y, final_domain)
+
+class MixedDomainDataset(Dataset):
+	def __init__(self):
+		super(MixedDomainDataset)
+		self.source_dataset = datasets.MNIST('./dataMNIST', train=True, download=True,
+					   transform=transforms.Compose([
+						   transforms.ToTensor(),
+						   transforms.Normalize((0.1307,), (0.3081,))
+					   ]))
+		self.target_dataset = datasets.SVHN('./dataSVHN', download=True,
+					   transform=transforms.Compose([
+						   transforms.ToTensor(),
+						   transforms.Normalize((0.1307,), (0.3081,))
+					   ]))
+	def __getitem__(self, index):
+		#TODO
+		domain_number = 0
+		if index > len(self.source_dataset):
+			index = len(self.source_dataset) - index
+			domain_number = 1
+			# print(self.target_dataset[index])
+			return self.target_dataset[index], domain_number
+		else:
+			return self.source_dataset[index], domain_number
+
+	def __len__(self):
+		return len(self.source_dataset) + len(self.target_dataset)
+
 def main():
 	# Training settings
 	parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -64,20 +101,33 @@ def main():
 
 	device = torch.device("cuda" if use_cuda else "cpu")
 
-	kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-	train_loader = torch.utils.data.DataLoader(
-		datasets.MNIST('./data', train=True, download=True,
+	kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {} 
+
+	mnistDataset = datasets.MNIST('./dataMNIST', train=True, download=True,
 					   transform=transforms.Compose([
 						   transforms.ToTensor(),
 						   transforms.Normalize((0.1307,), (0.3081,))
-					   ])),
-		batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn_task1, **kwargs)
-	test_loader = torch.utils.data.DataLoader(
-		datasets.MNIST('./data', train=False, transform=transforms.Compose([
+					   ]))
+	svhnDataset = datasets.SVHN('./dataSVHN', download=True,
+					   transform=transforms.Compose([
 						   transforms.ToTensor(),
 						   transforms.Normalize((0.1307,), (0.3081,))
-					   ])),
-		batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn_task1, **kwargs)
+					   ]))
+	train_dataset = MixedDomainDataset()
+	print("MixedDomainDataset: ", len(train_dataset))
+	# train_source_loader = torch.utils.data.DataLoader(
+	# 	datasets.MNIST('./dataMNIST', train=True, download=True,
+	# 				   transform=transforms.Compose([
+	# 					   transforms.ToTensor(),
+	# 					   transforms.Normalize((0.1307,), (0.3081,))
+	# 				   ])),
+	# 	batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn_task1, **kwargs)
+	train_loader = torch.utils.data.DataLoader(
+		train_dataset,
+		batch_size=args.batch_size, shuffle=True, collate_fn=collate_mixed_domain, **kwargs)
+	test_loader = torch.utils.data.DataLoader(
+		train_dataset,
+		batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_mixed_domain, **kwargs)
 
 
 	model = Net().to(device)
@@ -96,75 +146,6 @@ def main():
 	epoch_train_accuracy = []
 	epoch_train_loss = []
 
-	#Setting training as Task 2
-	train_loader2 = torch.utils.data.DataLoader(
-		datasets.MNIST('./data', train=True, download=True,
-					   transform=transforms.Compose([
-						   transforms.ToTensor(),
-						   transforms.Normalize((0.1307,), (0.3081,))
-					   ])),
-		batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn_task2, **kwargs)
-
-	# Setting test as Task 1
-	test_loader1 = torch.utils.data.DataLoader(
-		datasets.MNIST('./data', train=False, transform=transforms.Compose([
-						   transforms.ToTensor(),
-						   transforms.Normalize((0.1307,), (0.3081,))
-					   ])),
-		batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn_task1, **kwargs)
-
-	test_loader2 = torch.utils.data.DataLoader(
-		datasets.MNIST('./data', train=False, transform=transforms.Compose([
-						   transforms.ToTensor(),
-						   transforms.Normalize((0.1307,), (0.3081,))
-					   ])),
-		batch_size=args.test_batch_size, shuffle=True, collate_fn=collate_fn_task2, **kwargs)
-
-	print("Training on Task 2...")
-	for epoch in range(1, args.epochs + 1):
-		train(model, device, train_loader2, optimizer, epoch, 
-				epoch_train_loss, epoch_train_accuracy)
-		print("Task 1:")
-		test(model, device, test_loader1)
-		print("Task 2:")
-		test(model, device, test_loader2)
-
-	task2_train = epoch_train_accuracy
-	task2_loss = epoch_train_loss
-	epoch_train_accuracy = []
-	epoch_train_loss = []
-
-	print("Retraining on Task 1...")
-	for epoch in range(1, args.epochs + 1):
-		train(model, device, train_loader, optimizer, epoch, 
-				epoch_train_loss, epoch_train_accuracy)
-		print("Task 1:")
-		test(model, device, test_loader1)
-		print("Task 2:")
-		test(model, device, test_loader2)
-
-	retrain_task1_train = epoch_train_accuracy
-	retrain_task1_loss = epoch_train_loss
-	epoch_train_accuracy = []
-	epoch_train_loss = []
-
-	all_train_accuracy = np.array([task1_train, task2_train, retrain_task1_train]).flatten()
-	all_train_loss = np.array([task1_loss, task2_loss, retrain_task1_loss]).flatten()
-	print(all_train_accuracy)
-	np.save("train_acc", all_train_accuracy)
-	np.save("train_loss", all_train_loss)
-	plt.ylim(0,1)
-	plt.plot(range(len(all_train_accuracy)), all_train_accuracy)
-	plt.savefig("TrainingResults_MNIST.jpg")
-
-	print("Evaluating on full dataset...")
-	test_loader_all = torch.utils.data.DataLoader(
-	datasets.MNIST('./data', train=False, transform=transforms.Compose([
-					   transforms.ToTensor(),
-					   transforms.Normalize((0.1307,), (0.3081,))
-				   ])),
-	batch_size=args.test_batch_size, shuffle=True, **kwargs)
-	test(model, device, test_loader_all)
 
 if __name__ == '__main__':
 	main()
