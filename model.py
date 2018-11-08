@@ -39,36 +39,42 @@ class LabelPredictor(nn.Module):
         return x_class
 
 class GradReverse(torch.autograd.Function):
+    def __init__(self, lambd):
+        super(GradReverse, self)
+        self.lambd = lambd
+
     def forward(self, x):
         return x.view_as(x)
 
     def backward(self, grad_output):
-        return (grad_output * -lambd)
+        return (grad_output * -self.lambd)
 
-def grad_reverse(x):
-    return GradReverse()(x)
+def grad_reverse(x, lambd):
+    return GradReverse(lambd)(x)
 
 class DomainClassifier(nn.Module):
-    def __init__(self):
+    def __init__(self, lambd):
         super(DomainClassifier, self).__init__()
         self.fc1 = nn.Linear(768, 100) 
         self.fc2 = nn.Linear(100, 1)
         self.drop = nn.Dropout2d(0.25)
+        self.lambd = lambd
 
     def forward(self, x):
-        x = grad_reverse(x)
+        x = grad_reverse(x, self.lambd)
         x = F.leaky_relu(self.drop(self.fc1(x)))
         x = self.fc2(x)
         return F.sigmoid(x)
-        
+
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, lambd):
         super(Net, self).__init__()
         self.feature_extractor = FeatureExtractor()
 
         self.label_predictor = LabelPredictor()
         
-        self.domain_classifier = DomainClassifier()
+        self.lambd = lambd
+        self.domain_classifier = DomainClassifier(self.lambd)
 
     def forward(self, x):
         x_feature = self.feature_extractor(x)
