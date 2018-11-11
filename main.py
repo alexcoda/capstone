@@ -4,18 +4,33 @@ import torch
 # Local imports
 from utils import get_dataloader
 from train_DA import train_DA
+from train_LWF import train_LWF
 
 
-def run_DA_model(source_dataset, target_dataset, args):
+def run_DA_model(source_name, target_name, args):
     """Function for running experiments using the domain adaptation model."""
 
     # Get the DataLoaders
-    train_loader = get_dataloader([source_dataset, target_dataset], True, args)
-    test_source_loader = get_dataloader(source_dataset, False, args)
-    test_target_loader = get_dataloader(target_dataset, False, args)
+    train_loader = get_dataloader([source_name, target_name], True, args)
+    test_source_loader = get_dataloader(source_name, False, args)
+    test_target_loader = get_dataloader(target_name, False, args)
 
     # Train the model
     train_DA(train_loader, test_source_loader, test_target_loader, args)
+
+
+def run_LWF_model(source_name, target_name, args):
+    """Function for running experiments using the learning without forgetting model."""
+
+    # Get the DataLoaders
+    train_source_loader = get_dataloader(source_name, True, args)
+    train_target_loader = get_dataloader(target_name, True, args)
+    test_source_loader = get_dataloader(source_name, False, args)
+    test_target_loader = get_dataloader(target_name, False, args)
+
+    # Train the model
+    train_LWF(train_source_loader, train_target_loader,
+              test_target_loader, test_source_loader, args)
 
 
 def main(args):
@@ -25,7 +40,9 @@ def main(args):
     args.device = torch.device("cuda" if use_cuda else "cpu")
     args.dataloader_kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    run_DA_model('mnist', 'svhn', args)
+    # run_DA_model('mnist', 'svhn', args)
+
+    run_LWF_model('mnist', 'svhn', args)
 
 
 if __name__ == '__main__':
@@ -47,5 +64,7 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
+    parser.add_argument('--lambd', type=float, default=1.0, metavar='L',
+                        help='The parameter to balance remebering old data vs. learning new')
     args = parser.parse_args()
     main(args)

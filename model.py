@@ -4,6 +4,7 @@ import torch
 
 
 class FeatureExtractor(nn.Module):
+
     def __init__(self):
         super(FeatureExtractor, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=5)
@@ -19,11 +20,12 @@ class FeatureExtractor(nn.Module):
 
 
 class LabelPredictor(nn.Module):
-    def __init__(self):
+
+    def __init__(self, n_classes=10):
         super(LabelPredictor, self).__init__()
         self.fc1 = nn.Linear(48 * 4 * 4, 100)
         self.fc2 = nn.Linear(100, 100)
-        self.op = nn.Linear(100, 10)
+        self.op = nn.Linear(100, n_classes)
 
     def forward(self, x):
         x_class = F.relu(self.fc1(x))
@@ -35,6 +37,7 @@ class LabelPredictor(nn.Module):
 
 
 class GradReverse(torch.autograd.Function):
+
     def __init__(self, lambd):
         super(GradReverse, self)
         self.lambd = lambd
@@ -51,6 +54,7 @@ def grad_reverse(x, lambd):
 
 
 class DomainClassifier(nn.Module):
+
     def __init__(self, lambd):
         super(DomainClassifier, self).__init__()
         self.fc1 = nn.Linear(768, 100)
@@ -65,14 +69,14 @@ class DomainClassifier(nn.Module):
         return F.sigmoid(x)
 
 
-class Net(nn.Module):
+class DANet(nn.Module):
+
     def __init__(self, lambd):
-        super(Net, self).__init__()
-        self.feature_extractor = FeatureExtractor()
-
-        self.label_predictor = LabelPredictor()
-
+        super(DANet, self).__init__()
         self.lambd = lambd
+
+        self.feature_extractor = FeatureExtractor()
+        self.label_predictor = LabelPredictor()
         self.domain_classifier = DomainClassifier(self.lambd)
 
     def forward(self, x):
@@ -83,3 +87,26 @@ class Net(nn.Module):
         x_domain = self.domain_classifier(x_feature)
 
         return x_class, x_domain
+
+
+class LWFNet(nn.Module):
+
+    def __init__(self, lambd, init_task_n_classes=10):
+        super(LWFNet, self).__init__()
+        self.lambd = lambd
+
+        self.feature_extractor = FeatureExtractor()
+        self._label_predictor1 = LabelPredictor(init_task_n_classes)
+        self.label_predictors = [self._label_predictor1]
+
+    def forward(self, x):
+        # Do the forward pass. Here we predict for each separate label predictor
+        x_feature = self.feature_extractor(x)
+        x_classes = [lp(x_feature) for lp in self.label_predictors]
+
+        return x_classes
+
+    def add_prediction_layer(self, device, n_classes):
+        """Add another layer to the output for predicting on another task."""
+        lp = LabelPredictor(n_classes).to(device)
+        self.label_predictors.append(lp)
