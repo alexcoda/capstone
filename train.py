@@ -29,7 +29,7 @@ def train(model, device, train_loader, optimizer, epoch,
 
         loss = loss_label + loss_domain
 
-        pbar.set_description("Loss: %.4f" % loss.item())
+        pbar.set_description(f"Loss: {loss.item():0.4f}")
         pbar.update(1)
         loss.backward()
         optimizer.step()
@@ -55,6 +55,6 @@ def test(model, device, test_loader):
             n_examples += target.shape[0]
 
     test_loss /= n_examples
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, n_examples,
-        100. * correct / n_examples))
+    perc_correct = 100. * correct / n_examples
+    print(f"\nTest set: Average loss: {test_loss:0.4f},"
+          f"Accuracy: {correct}/{n_examples} ({perc_correct:.0f}%)\n")
