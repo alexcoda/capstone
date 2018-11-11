@@ -7,9 +7,9 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from tqdm import tqdm
 import numpy as np
-import sys 
+import sys
 
-def train(model, device, train_loader, optimizer, epoch, 
+def train(model, device, train_loader, optimizer, epoch,
         epoch_train_loss, epoch_train_accuracy):
     global log_interval
     model.train()
@@ -18,10 +18,10 @@ def train(model, device, train_loader, optimizer, epoch,
     batches = 0
     accuracy = 0
     n_examples = 0
-    correct =0 
+    correct =0
     for (data, target, domain) in pbar:
         batches += 1
-        data, target = data.to(device), target.to(device)
+        data, target, domain = data.to(device), target.to(device), domain.to(device)
         optimizer.zero_grad()
         output_class, output_domain = model(data)
         pred = output_class.max(1, keepdim=True)[1] # get the index of the max log-probability
@@ -30,7 +30,7 @@ def train(model, device, train_loader, optimizer, epoch,
         loss_label = F.nll_loss(output_class, target)
         loss_domain = F.binary_cross_entropy_with_logits(output_domain, domain.view(-1,1))
 
-        loss = loss_label + loss_domain 
+        loss = loss_label + loss_domain
 
         pbar.set_description("Loss: %.4f"%loss.item())
         pbar.update(1)
@@ -50,7 +50,8 @@ def test(model, device, test_loader):
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output_class, output_domain  = model(data)
-            test_loss += F.nll_loss(output_class, target, reduction='sum').item() # sum up batch loss
+            # Removed kwarg: reduction = 'sum' b/c not compliant with pytorch 4.0
+            test_loss += F.nll_loss(output_class, target).item()
             pred = output_class.max(1, keepdim=True)[1] # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             n_examples += target.shape[0]
