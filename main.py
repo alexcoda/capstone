@@ -1,12 +1,9 @@
-import torch.optim as optim
 import argparse
 import torch
 
-from train import train, test
-from model import Net
-
 # Local imports
 from utils import get_dataloader
+from train_DA import train_DA
 
 
 def run_DA_model(source_dataset, target_dataset, args):
@@ -17,23 +14,8 @@ def run_DA_model(source_dataset, target_dataset, args):
     test_source_loader = get_dataloader(source_dataset, False, args)
     test_target_loader = get_dataloader(target_dataset, False, args)
 
-    # Initialize our model
-    model = Net(1).to(args.device)
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
-
-    epoch_train_loss = []
-    epoch_train_accuracy = []
-    print("Training on Task 1...")
-    for epoch in range(1, args.epochs + 1):
-        train(model, args.device, train_loader, optimizer, epoch,
-              epoch_train_loss, epoch_train_accuracy)
-        test(model, args.device, test_source_loader)
-        test(model, args.device, test_target_loader)
-
-    task1_train = epoch_train_accuracy
-    task1_loss = epoch_train_loss
-    epoch_train_accuracy = []
-    epoch_train_loss = []
+    # Train the model
+    train_DA(train_loader, test_source_loader, test_target_loader, args)
 
 
 def main(args):
@@ -48,7 +30,7 @@ def main(args):
 
 if __name__ == '__main__':
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser = argparse.ArgumentParser(description='Image classifier args')
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
