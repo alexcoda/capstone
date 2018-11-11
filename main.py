@@ -1,20 +1,17 @@
-from __future__ import print_function
-import argparse
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
-from torch.utils.data.dataset import Dataset, ConcatDataset
-from tqdm import tqdm
 import numpy as np
-import sys
+import matplotlib
+import argparse
+
+import torch
+from torchvision import datasets, transforms
+from torch.utils.data.dataset import Dataset
 from train import train, test
 from model import Net
-import matplotlib
 from PIL import Image
+
 matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
+
 
 def collate_mixed_domain(data):
     data_x, data_y, data_domain = zip(*data)
@@ -23,6 +20,7 @@ def collate_mixed_domain(data):
     final_domain = torch.from_numpy(np.array(data_domain, dtype=np.float32))
 
     return (final_x, final_y, final_domain)
+
 
 class GrayscaleToRgb:
     """Convert a grayscale image to rgb"""
@@ -34,22 +32,23 @@ class GrayscaleToRgb:
         image = np.dstack([image, image, image])
         return Image.fromarray(image)
 
+
 class MixedDomainDataset(Dataset):
     def __init__(self):
         super(MixedDomainDataset)
-        self.source_dataset = datasets.MNIST('./dataMNIST', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ]))
-        self.target_dataset = datasets.SVHN('./dataSVHN', download=True,
-                       transform=transforms.Compose([
-                            transforms.Grayscale(),
-                            transforms.RandomCrop(28),
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,)
-                             )
-                       ]))
+        self.source_dataset = \
+            datasets.MNIST('./dataMNIST', train=True, download=True,
+                           transform=transforms.Compose([
+                               transforms.ToTensor(),
+                               transforms.Normalize((0.1307,), (0.3081,))]))
+        self.target_dataset = \
+            datasets.SVHN('./dataSVHN', download=True,
+                          transform=transforms.Compose([
+                              transforms.Grayscale(),
+                              transforms.RandomCrop(28),
+                              transforms.ToTensor(),
+                              transforms.Normalize((0.1307,), (0.3081,))]))
+
     def __getitem__(self, index):
         domain_number = 0.0
         if index >= len(self.source_dataset):
@@ -61,6 +60,7 @@ class MixedDomainDataset(Dataset):
 
     def __len__(self):
         return len(self.source_dataset) + len(self.target_dataset)
+
 
 def main():
     # Training settings
@@ -93,20 +93,18 @@ def main():
     train_dataset = MixedDomainDataset()
     print("MixedDomainDataset: ", len(train_dataset))
 
-    source_dataset = datasets.MNIST('./dataMNIST', train=False, download=True,
+    source_dataset = \
+        datasets.MNIST('./dataMNIST', train=False, download=True,
                        transform=transforms.Compose([
                            transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ]))
-    target_dataset = datasets.SVHN('./dataSVHN', download=True,
-                split = 'test',
-                   transform=transforms.Compose([
-                        transforms.Grayscale(),
-                        transforms.RandomCrop(28),
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,)
-                         )
-                   ]))
+                           transforms.Normalize((0.1307,), (0.3081,))]))
+    target_dataset = \
+        datasets.SVHN('./dataSVHN', download=True, split='test',
+                      transform=transforms.Compose([
+                          transforms.Grayscale(),
+                          transforms.RandomCrop(28),
+                          transforms.ToTensor(),
+                          transforms.Normalize((0.1307,), (0.3081,))]))
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size, shuffle=True, collate_fn=collate_mixed_domain, **kwargs)
@@ -117,7 +115,6 @@ def main():
         target_dataset,
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-
     model = Net(1).to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
@@ -126,7 +123,7 @@ def main():
     print("Training on Task 1...")
     for epoch in range(1, args.epochs + 1):
         train(model, device, train_loader, optimizer, epoch,
-                epoch_train_loss, epoch_train_accuracy)
+              epoch_train_loss, epoch_train_accuracy)
         test(model, device, test_loader_source)
         test(model, device, test_loader_target)
 

@@ -1,13 +1,7 @@
-from __future__ import print_function
-import argparse
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-from tqdm import tqdm_notebook as tqdm
-import numpy as np
-import sys 
+import torch.nn as nn
+import torch
+
 
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -20,13 +14,14 @@ class FeatureExtractor(nn.Module):
     def forward(self, x):
         x = F.relu(self.pool1(self.conv1(x)))
         x = F.relu(self.pool2(self.conv2(x)))
-        x = x.view(-1, 48*4*4)
+        x = x.view(-1, 48 * 4 * 4)
         return x
+
 
 class LabelPredictor(nn.Module):
     def __init__(self):
         super(LabelPredictor, self).__init__()
-        self.fc1 = nn.Linear(48*4*4, 100)
+        self.fc1 = nn.Linear(48 * 4 * 4, 100)
         self.fc2 = nn.Linear(100, 100)
         self.op = nn.Linear(100, 10)
 
@@ -37,6 +32,7 @@ class LabelPredictor(nn.Module):
         x_class = self.op(x_class)
         x_class = F.log_softmax(x_class, dim=1)
         return x_class
+
 
 class GradReverse(torch.autograd.Function):
     def __init__(self, lambd):
@@ -49,13 +45,15 @@ class GradReverse(torch.autograd.Function):
     def backward(self, grad_output):
         return (grad_output * -self.lambd)
 
+
 def grad_reverse(x, lambd):
     return GradReverse(lambd)(x)
+
 
 class DomainClassifier(nn.Module):
     def __init__(self, lambd):
         super(DomainClassifier, self).__init__()
-        self.fc1 = nn.Linear(768, 100) 
+        self.fc1 = nn.Linear(768, 100)
         self.fc2 = nn.Linear(100, 1)
         self.drop = nn.Dropout2d(0.25)
         self.lambd = lambd
@@ -66,19 +64,20 @@ class DomainClassifier(nn.Module):
         x = self.fc2(x)
         return F.sigmoid(x)
 
+
 class Net(nn.Module):
     def __init__(self, lambd):
         super(Net, self).__init__()
         self.feature_extractor = FeatureExtractor()
 
         self.label_predictor = LabelPredictor()
-        
+
         self.lambd = lambd
         self.domain_classifier = DomainClassifier(self.lambd)
 
     def forward(self, x):
         x_feature = self.feature_extractor(x)
-        
+
         x_class = self.label_predictor(x_feature)
 
         x_domain = self.domain_classifier(x_feature)
