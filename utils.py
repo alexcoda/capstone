@@ -8,17 +8,18 @@ from PIL import Image
 
 def get_dataloader(name, train, args):
     """Return the dataloader for a given dataset."""
+    batch_size = args.batch_size if train else args.test_batch_size
     if type(name) is not str:
         # MixedDomainDataset
         dataset = MixedDomainDataset(*name, train)
         loader = torch.utils.data.DataLoader(
-            dataset, batch_size=args.batch_size, shuffle=True,
+            dataset, batch_size=batch_size, shuffle=True,
             collate_fn=collate_mixed_domain, **args.dataloader_kwargs)
     else:
         # Regular Dataset
         dataset = get_dataset(name, train)
         loader = torch.utils.data.DataLoader(
-            dataset, batch_size=args.test_batch_size, shuffle=True,
+            dataset, batch_size=batch_size, shuffle=True,
             **args.dataloader_kwargs)
 
     return loader

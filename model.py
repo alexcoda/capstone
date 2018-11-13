@@ -96,8 +96,7 @@ class LWFNet(nn.Module):
         self.lambd = lambd
 
         self.feature_extractor = FeatureExtractor()
-        self._label_predictor1 = LabelPredictor(init_task_n_classes)
-        self.label_predictors = [self._label_predictor1]
+        self.label_predictors = nn.ModuleList([LabelPredictor(init_task_n_classes)])
 
     def forward(self, x):
         # Do the forward pass. Here we predict for each separate label predictor
@@ -108,5 +107,4 @@ class LWFNet(nn.Module):
 
     def add_prediction_layer(self, device, n_classes):
         """Add another layer to the output for predicting on another task."""
-        lp = LabelPredictor(n_classes).to(device)
-        self.label_predictors.append(lp)
+        self.label_predictors.append(LabelPredictor(n_classes).to(device))
