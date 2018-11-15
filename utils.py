@@ -2,6 +2,7 @@ import numpy as np
 import torch
 
 from torch.utils.data.dataset import Dataset
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from PIL import Image
 
@@ -12,15 +13,14 @@ def get_dataloader(name, train, args):
     if type(name) is not str:
         # MixedDomainDataset
         dataset = MixedDomainDataset(*name, train)
-        loader = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=True,
-            collate_fn=collate_mixed_domain, **args.dataloader_kwargs)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                            collate_fn=collate_mixed_domain,
+                            **args.dataloader_kwargs)
     else:
         # Regular Dataset
         dataset = get_dataset(name, train)
-        loader = torch.utils.data.DataLoader(
-            dataset, batch_size=batch_size, shuffle=True,
-            **args.dataloader_kwargs)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True,
+                            **args.dataloader_kwargs)
 
     return loader
 
@@ -77,11 +77,13 @@ class MixedDomainDataset(Dataset):
     def __getitem__(self, index):
         if index >= len(self.source_dataset):
             index = len(self.source_dataset) - index
-            domain_number = 1.0
-            return self.target_dataset[index][0], self.target_dataset[index][1], domain_number
+            return (self.target_dataset[index][0],
+                    self.target_dataset[index][1],
+                    1.0)
         else:
-            domain_number = 0.0
-            return self.source_dataset[index][0], self.source_dataset[index][1].item(), domain_number
+            return (self.source_dataset[index][0],
+                    self.source_dataset[index][1].item(),
+                    0.0)
 
     def __len__(self):
         return len(self.source_dataset) + len(self.target_dataset)
