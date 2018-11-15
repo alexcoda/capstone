@@ -64,7 +64,7 @@ if __name__ == '__main__':
                         help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--lambd', type=float, default=1.0, metavar='L',
+    parser.add_argument('--lambd', type=float, default=0.1, metavar='L',
                         help='The parameter to balance remebering old data vs. learning new')
     args = parser.parse_args()
     main(args)

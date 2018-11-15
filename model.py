@@ -91,9 +91,8 @@ class DANet(nn.Module):
 
 class LWFNet(nn.Module):
 
-    def __init__(self, lambd, init_task_n_classes=10):
+    def __init__(self, init_task_n_classes=10):
         super(LWFNet, self).__init__()
-        self.lambd = lambd
 
         self.feature_extractor = FeatureExtractor()
         self.label_predictors = nn.ModuleList([LabelPredictor(init_task_n_classes)])
@@ -108,3 +107,21 @@ class LWFNet(nn.Module):
     def add_prediction_layer(self, device, n_classes):
         """Add another layer to the output for predicting on another task."""
         self.label_predictors.append(LabelPredictor(n_classes).to(device))
+
+    def freeze_params(self, task_id):
+        """Freeze all parameters of this model except for the current task."""
+        self._toggle_params(task_id, freeze=True)
+
+    def unfreeze_params(self, task_id):
+        """Unfreeze all parameters of this model except for the current task."""
+        self._toggle_params(task_id, freeze=False)
+
+    def _toggle_params(self, task_id, freeze):
+        """Toggle whether params are frozen."""
+        requires_grad = not freeze
+        for param in self.feature_extractor.parameters():
+            param.requires_grad = requires_grad
+        for i, layer in enumerate(self.label_predictors):
+            if i != task_id:
+                for param in layer.parameters():
+                    param.requires_grad = requires_grad
