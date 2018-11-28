@@ -2,12 +2,12 @@ import argparse
 import torch
 
 # Local imports
-from utils import get_dataloader
-from train_DA import train_DA
+from utils import get_dataloader, save_results
 from train_LWF import train_LWF
+from train_DA import train_DA
 
 
-def run_DA_model(source_name, target_name, args):
+def run_DA_model(save_name, source_name, target_name, args):
     """Function for running experiments using the domain adaptation model."""
 
     # Get the DataLoaders
@@ -16,10 +16,12 @@ def run_DA_model(source_name, target_name, args):
     test_target_loader = get_dataloader(target_name, False, args)
 
     # Train the model
-    train_DA(train_loader, test_source_loader, test_target_loader, args)
+    results_df = train_DA(train_loader, test_source_loader, test_target_loader, args)
+
+    save_results('da', save_name, results_df)
 
 
-def run_LWF_model(source_name, target_name, args):
+def run_LWF_model(save_name, source_name, target_name, args):
     """Function for running experiments using the learning without forgetting model."""
 
     # Get the DataLoaders
@@ -29,8 +31,10 @@ def run_LWF_model(source_name, target_name, args):
     test_target_loader = get_dataloader(target_name, False, args)
 
     # Train the model
-    train_LWF(train_source_loader, train_target_loader,
-              test_target_loader, test_source_loader, args)
+    results_df = train_LWF(train_source_loader, train_target_loader,
+                           test_target_loader, test_source_loader, args)
+
+    save_results('lwf', save_name, results_df)
 
 
 def main(args):
@@ -40,9 +44,11 @@ def main(args):
     args.device = torch.device("cuda" if use_cuda else "cpu")
     args.dataloader_kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    # run_DA_model('mnist', 'svhn', args)
+    save_name = f"reversed_tasks_{args.epochs}_epoch_lambda={args.lambd}"
 
-    run_LWF_model('mnist', 'svhn', args)
+    # run_DA_model(save_name, 'mnist', 'svhn', args)
+
+    run_LWF_model(save_name, 'mnist', 'svhn', args)
 
 
 if __name__ == '__main__':

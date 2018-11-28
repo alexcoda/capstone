@@ -1,12 +1,13 @@
+"""Functions/classes used for LwF experiments."""
 import torch.nn.functional as F
 import torch.optim as optim
-import torch
+import pandas as pd
 import copy
-import sys
 
+# Local imports
 from model import LWFNet
-from tqdm import tqdm
-from abc import ABC, abstractmethod
+from utils import combine_dataframes
+from train import TrainingPeriod, Tester
 
 
 def train_LWF(train_source_loader, train_target_loader,
@@ -21,107 +22,35 @@ def train_LWF(train_source_loader, train_target_loader,
     # Set-up the tests to run on our model
     source_tester = Tester(test_source_loader, args, task_id=0)
     target_tester = Tester(test_target_loader, args, task_id=1)
+    cols = ['train_task_0', 'train_task_1', 'test_task_0', 'test_task_1',
+            'phase']
+    results_df = pd.DataFrame(columns=cols)
 
     """Initial training on task 1."""
     print("~~~ Training Task 1 ~~~")
     base_testers = [source_tester]
-    base_task = BaseTask(train_source_loader, model, optim_kwargs,
-                         base_testers, args, task_id=0)
-    base_task.train()
+    base_task = BaseTask(train_source_loader, model, optim_kwargs, base_testers,
+                         args, task_id=0, phase_id=0, df=results_df.copy())
+    base_df = base_task.train()
 
     """Warm-up step for task 2."""
     print("~~~ Training Task 2 ~~~")
     print("~~~ Warm up ~~~")
     testers = [source_tester, target_tester]
-    warmup_phase = WarmUpTask(train_target_loader, model, optim_kwargs,
-                              testers, args, task_id=1)
-    warmup_phase.train()
+    warmup_phase = WarmUpTask(train_target_loader, model, optim_kwargs, testers,
+                              args, task_id=1, phase_id=1, df=results_df.copy())
+    warmup_df = warmup_phase.train()
 
     """Fine-tune step for task 2."""
     print("~~~ Fine Tune ~~~")
     testers = [source_tester, target_tester]
     orig_model = warmup_phase.orig_model
     fine_tune_phase = FineTuneTask(orig_model, args.lambd, train_target_loader,
-                                   model, optim_kwargs, testers, args, task_id=1)
-    fine_tune_phase.train()
+                                   model, optim_kwargs, testers, args,
+                                   task_id=1, phase_id=2, df=results_df.copy())
+    fine_tune_df = fine_tune_phase.train()
 
-
-class TrainingPeriod(ABC):
-    """Abstract class representing a period of training during an experiment."""
-
-    def __init__(self, train_loader, model, optim_kwargs, testers, args, task_id):
-        self.epochs = args.epochs
-        self.device = args.device
-
-        self.train_loader = train_loader
-        self.task_id = task_id
-        self.testers = testers
-
-        self._init_model(model)
-        self._init_optimizer(optim_kwargs)
-
-        self.epoch_train_loss = []
-        self.epoch_train_accuracy = []
-
-    def _init_model(self, model):
-        self.model = model
-
-    def _init_optimizer(self, optim_kwargs):
-        """Initialize the optimizer."""
-        self.optimizer = optim.SGD(self.model.parameters(), **optim_kwargs)
-
-    def train(self):
-        """Train a model and run all associated tests on it."""
-        for epoch in range(1, self.epochs + 1):
-            self.train_epoch()
-            for t in self.testers:
-                t.test(self.model)
-
-    def train_epoch(self):
-        # Stats to track
-        total_loss = 0
-        batches = 0
-        accuracy = 0
-        n_examples = 0
-        correct = 0
-
-        self.model.train()
-
-        # Wrap our data in a tqdm progress bar and iterate through all batches
-        pbar = tqdm(self.train_loader, file=sys.stdout)
-        for data, target in pbar:
-            data, target = data.to(self.device), target.to(self.device)
-            batches += 1
-
-            # Predict on the data
-            self.optimizer.zero_grad()
-            outputs = self.model(data)
-
-            loss = self.get_loss(data, outputs, target)
-
-            # Update the progress bar with this epoch's loss
-            pbar.set_description(f"Loss: {loss.item():0.4f}")
-            pbar.update(1)
-
-            loss.backward()
-            self.optimizer.step()
-            total_loss += loss.item()
-
-            # Check if the max-log prediction was correct
-            primary_task_classes = outputs[self.task_id]
-            pred = primary_task_classes.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            n_examples += target.shape[0]
-
-        self.epoch_train_loss.append(total_loss / batches)
-        self.epoch_train_accuracy.append(correct / (n_examples * 1.0))
-
-        print(f"Epoch Train Loss: {self.epoch_train_loss[-1]:0.4f}")
-        print(f"Epoch Train Acc: {self.epoch_train_accuracy[-1]:0.4f}")
-
-    @abstractmethod
-    def get_loss(self, data, outputs, target):
-        ...
+    return combine_dataframes([base_df, warmup_df, fine_tune_df])
 
 
 class BaseTask(TrainingPeriod):
@@ -185,33 +114,3 @@ class FineTuneTask(TrainingPeriod):
 
         loss = self.lambd * old_tasks_loss + curr_task_loss
         return loss
-
-
-class Tester:
-
-    def __init__(self, test_loader, args, task_id):
-        self.test_loader = test_loader
-        self.task_id = task_id
-        self.device = args.device
-
-    def test(self, model):
-        """Test a model."""
-        model.eval()
-        test_loss = 0
-        correct = 0
-        n_examples = 0
-        with torch.no_grad():
-            for data, target in self.test_loader:
-                data, target = data.to(self.device), target.to(self.device)
-                output_class = model(data)[self.task_id]
-                # Removed kwarg: reduction = 'sum' b/c not compliant with pytorch 4.0
-                test_loss += F.nll_loss(output_class, target).item()
-                # get the index of the max log-probability
-                pred = output_class.max(1, keepdim=True)[1]
-                correct += pred.eq(target.view_as(pred)).sum().item()
-                n_examples += target.shape[0]
-
-        test_loss /= n_examples
-        perc_correct = 100. * correct / n_examples
-        print(f"\nTest set: Average loss: {test_loss:0.4f},"
-              f"Accuracy: {correct}/{n_examples} ({perc_correct:.0f}%)\n")

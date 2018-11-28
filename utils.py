@@ -1,9 +1,12 @@
+import pandas as pd
 import numpy as np
 import torch
+import os
 
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+from datetime import datetime
 from PIL import Image
 
 
@@ -87,3 +90,25 @@ class MixedDomainDataset(Dataset):
 
     def __len__(self):
         return len(self.source_dataset) + len(self.target_dataset)
+
+
+def combine_dataframes(df_list):
+    """Combine DataFrames from different phases in a run."""
+    df = pd.concat(df_list, sort=False)
+    df.reset_index(inplace=True, drop=True)
+    return df
+
+
+def save_results(run_type, save_name, df, log_time=True):
+    """Save a copy of the run results."""
+    base_dir = f"output/{run_type}/"
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+
+    if log_time:
+        curr_time = datetime.now()
+        fname = f"{base_dir}{save_name}_{curr_time}.csv"
+    else:
+        fname = f"{base_dir}{save_name}.csv"
+
+    df.to_csv(fname)
