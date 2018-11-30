@@ -5,6 +5,7 @@ import sys
 
 from model import DANet
 from tqdm import tqdm
+import pdb
 
 
 def train_DA(train_loader, test_source_loader, test_target_loader, args):
@@ -46,7 +47,6 @@ def train_epoch(model, device, train_loader, optimizer, epoch,
         # Predict on the data
         optimizer.zero_grad()
         output_class, output_domain = model(data)
-
         # Check if the max-log prediction was correct
         pred = output_class.max(1, keepdim=True)[1]
         correct += pred.eq(target.view_as(pred)).sum().item()

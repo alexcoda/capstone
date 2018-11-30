@@ -1,6 +1,6 @@
 import torch.nn.functional as F
 import torch.nn as nn
-import torch
+import torch, pdb
 
 
 class FeatureExtractor(nn.Module):
@@ -62,7 +62,7 @@ class DomainClassifier(nn.Module):
         self.drop = nn.Dropout2d(0.25)
         self.lambd = lambd
 
-    def forward(self, x):
+    def forward(self, x):   
         x = grad_reverse(x, self.lambd)
         x = F.leaky_relu(self.drop(self.fc1(x)))
         x = self.fc2(x)
@@ -80,6 +80,8 @@ class DANet(nn.Module):
         self.domain_classifier = DomainClassifier(self.lambd)
 
     def forward(self, x):
+        # print("LOLOL")
+        # pdb.set_trace()
         x_feature = self.feature_extractor(x)
 
         x_class = self.label_predictor(x_feature)
