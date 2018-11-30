@@ -44,9 +44,25 @@ def get_dataset(name, train):
         return datasets.SVHN('./dataSVHN', download=True, split=split,
                              transform=transforms.Compose([
                                  transforms.Grayscale(),
-                                 transforms.RandomCrop(28),
+                                 transforms.Resize((28, 28)),
                                  transforms.ToTensor(),
                                  transforms.Normalize((0.1307,), (0.3081,))]))
+    elif name.lower() == 'stl10':
+        split = 'train' if train else 'test'
+        return datasets.STL10('./dataSTL10', download=True, split=split,
+                              transform=transforms.Compose([
+                                  transforms.Grayscale(),
+                                  transforms.Resize((28, 28)),
+                                  transforms.ToTensor(),
+                                  transforms.Normalize((0.1307,), (0.3081,))]))
+    elif name.lower() == 'cifar10':
+        split = 'train' if train else 'test'
+        return datasets.CIFAR10('./dataCIFAR10', download=True,
+                                transform=transforms.Compose([
+                                    transforms.Resize((28, 28)),
+                                    transforms.Grayscale(),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize((0.1307,), (0.3081,))]))
     else:
         raise ValueError(f"Dataset {name} not supported.")
 
@@ -74,6 +90,8 @@ def collate_mixed_domain(data):
 class MixedDomainDataset(Dataset):
     def __init__(self, source_dataset_name, target_dataset_name, train=True):
         super(MixedDomainDataset)
+        self.source_dataset_name = source_dataset_name
+        self.target_dataset_name = target_dataset_name
         self.source_dataset = get_dataset(source_dataset_name, train)
         self.target_dataset = get_dataset(target_dataset_name, train)
 
@@ -84,9 +102,14 @@ class MixedDomainDataset(Dataset):
                     self.target_dataset[index][1],
                     1.0)
         else:
-            return (self.source_dataset[index][0],
-                    self.source_dataset[index][1].item(),
-                    0.0)
+            if self.source_dataset_name == 'stl10' or self.target_dataset_name == 'stl10':
+                return (self.source_dataset[index][0],
+                        self.source_dataset[index][1],
+                        0.0)
+            else:
+                return (self.source_dataset[index][0],
+                        self.source_dataset[index][1].item(),
+                        0.0)
 
     def __len__(self):
         return len(self.source_dataset) + len(self.target_dataset)
@@ -111,4 +134,4 @@ def save_results(run_type, save_name, df, log_time=True):
     else:
         fname = f"{base_dir}{save_name}.csv"
 
-    df.to_csv(fname)
+    df.to_csv(fname, encoding='ascii')
