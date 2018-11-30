@@ -59,9 +59,6 @@ class TrainingPeriod(ABC):
 
         # Wrap our data in a tqdm progress bar and iterate through all batches
         pbar = tqdm(self.train_loader, file=sys.stdout)
-        for batch in pbar:
-            batch = [item.to(self.device) for item in batch]
-
         for data, target in pbar:
             data, target = data.to(self.device), target.to(self.device)
             batches += 1
@@ -102,8 +99,8 @@ class TrainingPeriod(ABC):
         test_vals = np.array(self.epoch_test_accuracy).T
 
         for i in task_ids:
-            self.df[f"test_task_{1 - i}"] = test_vals[i]
-        self.df[f"train_task_{1 - self.task_id}"] = self.epoch_train_accuracy
+            self.df[f"test_task_{i}"] = test_vals[i]
+        self.df[f"train_task_{self.task_id}"] = self.epoch_train_accuracy
         self.df['phase'] = self.phase_id
 
 

@@ -7,7 +7,7 @@ from train_LWF import train_LWF
 from train_DA import train_DA
 
 
-def run_DA_model(save_name, source_name, target_name, args):
+def run_DA_model(source_name, target_name, args):
     """Function for running experiments using the domain adaptation model."""
 
     # Get the DataLoaders
@@ -18,10 +18,11 @@ def run_DA_model(save_name, source_name, target_name, args):
     # Train the model
     results_df = train_DA(train_loader, test_source_loader, test_target_loader, args)
 
+    save_name = f"{source_name}-{target_name}_epoch={args.epochs}_lr={args.lr}_lambda={args.lambd}"
     save_results('da', save_name, results_df)
 
 
-def run_LWF_model(save_name, source_name, target_name, args):
+def run_LWF_model(source_name, target_name, args):
     """Function for running experiments using the learning without forgetting model."""
 
     # Get the DataLoaders
@@ -34,6 +35,7 @@ def run_LWF_model(save_name, source_name, target_name, args):
     results_df = train_LWF(train_source_loader, train_target_loader,
                            test_target_loader, test_source_loader, args)
 
+    save_name = f"{source_name}-{target_name}_epoch={args.epochs}_lr={args.lr}_lambda={args.lambd}"
     save_results('lwf', save_name, results_df)
 
 
@@ -44,11 +46,9 @@ def main(args):
     args.device = torch.device("cuda" if use_cuda else "cpu")
     args.dataloader_kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    save_name = f"reversed_tasks_{args.epochs}_epoch_lambda={args.lambd}"
+    run_DA_model('mnist', 'svhn', args)
 
-    # run_DA_model(save_name, 'mnist', 'svhn', args)
-
-    run_LWF_model(save_name, 'mnist', 'svhn', args)
+    # run_LWF_model('mnist', 'svhn', args)
 
 
 if __name__ == '__main__':
