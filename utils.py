@@ -1,14 +1,38 @@
-import pandas as pd
 import numpy as np
 import torch
-import os
 
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from datetime import datetime
 from PIL import Image
+from torch.utils.data.dataloader import default_collate
 
+from torch.autograd import Variable
+from torch.nn import init
+
+torch.manual_seed(0)
+
+import os
+import os.path
+import shutil
+
+
+
+def getmnist(train=True):
+
+    return datasets.MNIST('./dataMNIST', train=train, download=True,
+        transform=transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,))]))
+
+def temp_loader(batch_size, cuda=False, collate_fn=None):
+
+    dataset = getmnist()
+    return DataLoader(
+        dataset, batch_size=batch_size,
+        shuffle=True, collate_fn=(collate_fn or default_collate),
+        **({'num_workers': 2, 'pin_memory': True} if cuda else {})
+    )
 
 def get_dataloader(name, train, args):
     """Return the dataloader for a given dataset."""
@@ -69,6 +93,74 @@ def collate_mixed_domain(data):
     final_domain = torch.from_numpy(np.array(data_domain, dtype=np.float32))
 
     return (final_x, final_y, final_domain)
+
+
+class MixedDomainDataset(Dataset):
+    def __init__(self, source_dataset_name, target_dataset_name, train=True):
+        super(MixedDomainDataset)
+        self.source_dataset = get_dataset(source_dataset_name, train)
+        self.target_dataset = get_dataset(target_dataset_name, train)
+
+    def __getitem__(self, index):
+        if index >= len(self.source_dataset):
+            index = len(self.source_dataset) - index
+            return (self.target_dataset[index][0],
+                    self.target_dataset[index][1],
+                    1.0)
+        else:
+            return (self.source_dataset[index][0],
+                    self.source_dataset[index][1].item(),
+                    0.0)
+
+    def __len__(self):
+        return len(self.source_dataset) + len(self.target_dataset)
+
+
+def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None):
+
+    return DataLoader(
+        dataset, batch_size=batch_size,
+        shuffle=True, collate_fn=(collate_fn or default_collate),
+        **({'num_workers': 2, 'pin_memory': True} if cuda else {})
+    )
+
+def validate(model, data_loader, test_size=256, batch_size=32,
+             cuda=False, verbose=True):
+    mode = model.training
+    model.train(mode=False)
+    #data_loader = get_data_loader(dataset, batch_size, cuda=cuda)
+    total_tested = 0
+    total_correct = 0
+
+    for x, y in data_loader:
+
+        if model.flatten:
+          x = x.view(len(x), -1)
+        x = Variable(x).cuda() if cuda else Variable(x)
+        y = Variable(y).cuda() if cuda else Variable(y)
+        scores = model(x)
+        _, predicted = scores.max(1)
+        # update statistics.
+        total_correct += (predicted == y).sum().data.item()
+        total_tested += len(x)
+    model.train(mode=mode)
+    precision = total_correct / total_tested
+
+    print(total_correct, total_tested)
+    if verbose:
+        print('=> precision: {:.3f}'.format(precision))
+    return precision
+
+
+
+
+
+
+
+
+
+
+
 
 
 class MixedDomainDataset(Dataset):

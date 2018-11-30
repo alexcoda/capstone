@@ -1,7 +1,38 @@
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
+from functools import reduce
+from torch import nn
+from torch import autograd
+from torch.autograd import Variable
+import utils
 
+class MLP(nn.Module):
+
+    def __init__(self, input_size, output_size, 
+                    hidden_size=400,
+                    hidden_layer_num=2,
+                    hidden_dropout_prob=.5,
+                    input_dropout_prob=.2):
+
+        super(MLP, self).__init__()
+        self.input_size = input_size
+        self.input_dropout_prob = input_dropout_prob
+        self.hidden_size = hidden_size
+        self.hidden_layer_num = hidden_layer_num
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.output_size = output_size
+
+        self.layers = nn.ModuleList([
+            nn.Linear(self.input_size, self.hidden_size), nn.ReLU(),
+            nn.Dropout(self.input_dropout_prob),
+            *((nn.Linear(self.hidden_size, self.hidden_size), nn.ReLU(),
+               nn.Dropout(self.hidden_dropout_prob)) * self.hidden_layer_num),
+            nn.Linear(self.hidden_size, self.output_size)
+        ])
+
+    def forward(self, x):
+        return reduce(lambda x, l: l(x), self.layers, x)
 
 class FeatureExtractor(nn.Module):
 
@@ -35,6 +66,20 @@ class LabelPredictor(nn.Module):
         x_class = F.log_softmax(x_class, dim=1)
         return x_class
 
+class Predictor(nn.Module):
+
+    def __init__(self, n_classes=10):
+        super(Predictor, self).__init__()
+        self.fc1 = nn.Linear(48 * 4 * 4, 100)
+        self.fc2 = nn.Linear(100, 100)
+        self.op = nn.Linear(100, n_classes)
+
+    def forward(self, x):
+        x_class = F.relu(self.fc1(x))
+        x_class = F.dropout(x_class, training=self.training)
+        x_class = F.relu(self.fc2(x_class))
+        x_class = self.op(x_class)
+        return x_class
 
 class GradReverse(torch.autograd.Function):
 
@@ -125,3 +170,91 @@ class LWFNet(nn.Module):
             if i != task_id:
                 for param in layer.parameters():
                     param.requires_grad = requires_grad
+
+class EWCNet(nn.Module):
+    def __init__(self, input_size=784, output_size=10, flatten=False):
+        super().__init__()
+
+        self.flatten = flatten
+        if self.flatten:
+            self.MLP = MLP(input_size, output_size)
+        else:
+            self.feature_extractor = FeatureExtractor()
+            self.predictor = Predictor()
+
+    @property
+    def name(self):
+        return (
+            'MLP'
+            '-in{input_size}-out{output_size}'
+            '-h{hidden_size}x{hidden_layer_num}'
+            '-dropout_in{input_dropout_prob}_hidden{hidden_dropout_prob}'
+        ).format(
+            input_size=self.input_size,
+            output_size=self.output_size,
+            hidden_size=self.hidden_size,
+            hidden_layer_num=self.hidden_layer_num,
+            input_dropout_prob=self.input_dropout_prob,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+        )
+
+    def forward(self, x):
+
+        if self.flatten:
+            pred = self.MLP(x)
+        else:
+            features = self.feature_extractor(x)
+            pred = self.predictor(features)
+
+        return pred
+
+    def estimate_fisher(self, data_loader, sample_size, batch_size=32):
+
+        loglikelihoods = []
+        for x, y in data_loader:
+            batch_size = len(x)
+
+            if self.flatten:
+                x = x.view(batch_size, -1)
+
+            x = Variable(x).cuda() if self._is_on_cuda() else Variable(x)
+            y = Variable(y).cuda() if self._is_on_cuda() else Variable(y)
+            loglikelihoods.append(
+                F.log_softmax(self(x), dim=1)[range(batch_size), y.data]
+            )
+            if len(loglikelihoods) >= sample_size // batch_size:
+                break
+
+        loglikelihood = torch.cat(loglikelihoods).mean(0)
+        loglikelihood_grads = autograd.grad(loglikelihood, self.parameters())
+        parameter_names = [
+            n.replace('.', '__') for n, p in self.named_parameters()
+        ]
+        return {n: g**2 for n, g in zip(parameter_names, loglikelihood_grads)}
+
+    def consolidate(self, fisher):
+        for n, p in self.named_parameters():
+            n = n.replace('.', '__')
+            self.register_buffer('{}_estimated_mean'.format(n), p.data.clone())
+            self.register_buffer('{}_estimated_fisher'
+                                 .format(n), fisher[n].data.clone())
+
+    def get_ewc_loss(self, lamda, cuda=False):
+        try:
+            losses = []
+            for n, p in self.named_parameters():
+                n = n.replace('.', '__')
+                mean = getattr(self, '{}_estimated_mean'.format(n))
+                fisher = getattr(self, '{}_estimated_fisher'.format(n))
+                mean = Variable(mean)
+                fisher = Variable(fisher)
+                losses.append((fisher * (p-mean)**2).sum())
+            return (lamda/2)*sum(losses)
+        except AttributeError:
+            return (
+                Variable(torch.zeros(1)).cuda() if cuda else
+                Variable(torch.zeros(1))
+            )
+
+    def _is_on_cuda(self):
+        return next(self.parameters()).is_cuda

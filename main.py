@@ -5,6 +5,22 @@ import torch
 from utils import get_dataloader, save_results
 from train_LWF import train_LWF
 from train_DA import train_DA
+from train_EWC import train_ewc
+
+
+
+def run_EWC_model(save_name, source_name, target_name, args):
+
+    # Get the DataLoaders
+    train_source_loader = get_dataloader(source_name, True, args)
+    train_target_loader = get_dataloader(target_name, True, args)
+    test_source_loader = get_dataloader(source_name, False, args)
+    test_target_loader = get_dataloader(target_name, False, args)
+
+    train_datasets = [train_source_loader, train_target_loader]
+    test_datasets = [test_source_loader, test_target_loader]
+
+    train_ewc(train_datasets, test_datasets, consolidate=True)
 
 
 def run_DA_model(save_name, source_name, target_name, args):
@@ -48,7 +64,9 @@ def main(args):
 
     # run_DA_model(save_name, 'mnist', 'svhn', args)
 
-    run_LWF_model(save_name, 'mnist', 'svhn', args)
+    # run_LWF_model(save_name, 'mnist', 'svhn', args)
+
+    run_EWC_model(save_name, 'mnist', 'svhn', args)
 
 
 if __name__ == '__main__':
