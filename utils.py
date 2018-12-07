@@ -1,5 +1,9 @@
 import numpy as np
 import torch
+import pandas as pd
+from plotter import plot_from_frames, plot_from_csvs
+
+from datetime import datetime
 
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
@@ -152,17 +156,6 @@ def validate(model, data_loader, test_size=256, batch_size=32,
     return precision
 
 
-
-
-
-
-
-
-
-
-
-
-
 class MixedDomainDataset(Dataset):
     def __init__(self, source_dataset_name, target_dataset_name, train=True):
         super(MixedDomainDataset)
@@ -203,4 +196,5 @@ def save_results(run_type, save_name, df, log_time=True):
     else:
         fname = f"{base_dir}{save_name}.csv"
 
+    plot_from_frames([df])
     df.to_csv(fname)

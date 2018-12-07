@@ -10,18 +10,16 @@ from model import EWCNet
 torch.manual_seed(0)
 
 def train_ewc(train_datasets, test_datasets, epochs_per_task=2,
-          batch_size=64, test_size=1024, consolidate=False,
+          batch_size=64, consolidate=False,
           fisher_estimation_sample_size=1024,
           lr=1e-3, weight_decay=1e-5, lamda=5000,
-          loss_log_interval=30,
-          eval_log_interval=1000,
           cuda=False):
 
     print(consolidate)
     model = EWCNet(flatten=False)
 
 
-    criteriton = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr,
                            weight_decay=weight_decay)
 
@@ -58,7 +56,7 @@ def train_ewc(train_datasets, test_datasets, epochs_per_task=2,
 
                 optimizer.zero_grad()
                 scores = model(x)
-                ce_loss = criteriton(scores, y)
+                ce_loss = criterion(scores, y)
                 ewc_loss = model.get_ewc_loss(lamda, cuda=cuda)
                 loss = ce_loss + ewc_loss
                 loss.backward()
