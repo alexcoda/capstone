@@ -46,7 +46,7 @@ def get_dataset(name, train):
                                  transforms.Grayscale(),
                                  transforms.Resize((28, 28)),
                                  transforms.ToTensor(),
-                                 transforms.Normalize((0.1307,), (0.3081,))]))
+                                 transforms.Normalize((0.5,), (0.5,))]))
     elif name.lower() == 'stl10':
         split = 'train' if train else 'test'
         return datasets.STL10('./dataSTL10', download=True, split=split,
@@ -60,9 +60,9 @@ def get_dataset(name, train):
         return datasets.CIFAR10('./dataCIFAR10', download=True,
                                 transform=transforms.Compose([
                                     transforms.Resize((28, 28)),
+                                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
                                     transforms.Grayscale(),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize((0.1307,), (0.3081,))]))
+                                    transforms.ToTensor()]))
     else:
         raise ValueError(f"Dataset {name} not supported.")
 
