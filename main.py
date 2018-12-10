@@ -15,8 +15,12 @@ def run_DA_model(source_name, target_name, args):
     test_source_loader = get_dataloader(source_name, False, args)
     test_target_loader = get_dataloader(target_name, False, args)
 
+    args.DA_phase2 = True
+    print(args)
+    train_loader_phase2 = get_dataloader([source_name, target_name], True, args)
     # Train the model
-    results_df = train_DA(train_loader, test_source_loader, test_target_loader, args)
+    results_df = train_DA(train_loader, test_source_loader, test_target_loader,
+        train_loader_phase2, args)
 
     save_name = f"{source_name}-{target_name}_epoch={args.epochs}_lr={args.lr}_lambda={args.lambd}"
     save_results('da', save_name, results_df)
@@ -46,7 +50,7 @@ def main(args):
     args.device = torch.device("cuda" if use_cuda else "cpu")
     args.dataloader_kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    run_DA_model('mnist', 'svhn', args)
+    run_DA_model('svhn', 'cifar10', args)
 
     # run_LWF_model('mnist', 'svhn', args)
 
@@ -72,5 +76,9 @@ if __name__ == '__main__':
                         help='how many batches to wait before logging training status')
     parser.add_argument('--lambd', type=float, default=0.1, metavar='L',
                         help='The parameter to balance remebering old data vs. learning new')
+    parser.add_argument('--save_model', action='store_true', default=True,
+                        help='Whether to save the model')
+    parser.add_argument('--model_filename', default='saved_model',
+                        help='Model file prefix')
     args = parser.parse_args()
     main(args)
