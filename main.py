@@ -3,11 +3,21 @@ import torch
 
 # Local imports
 from utils import get_dataloader, save_results
+from text_utils import get_text_dataloader
 from train_LWF import train_LWF
 from train_DA import train_DA
 from train_EWC import train_ewc
+from train_text_EWC import train_text_ewc
 
 
+def run_text_EWC_model(save_name, source_name, target_name, args):
+
+    # Get the DataLoaders
+    names = [source_name, target_name]
+    train_loaders, test_loaders, vocab = get_text_dataloader(names, args)
+    vocab_size = len(vocab)
+
+    train_text_ewc(train_loaders, test_loaders, vocab_size, epochs_per_task=args.epochs, consolidate=True)
 
 def run_EWC_model(save_name, source_name, target_name, args):
 
@@ -20,7 +30,7 @@ def run_EWC_model(save_name, source_name, target_name, args):
     train_datasets = [train_source_loader, train_target_loader]
     test_datasets = [test_source_loader, test_target_loader]
 
-    train_ewc(train_datasets, test_datasets, consolidate=True)
+    train_ewc(train_datasets, test_datasets, epochs_per_task=args.epochs, consolidate=True)
 
 
 def run_DA_model(save_name, source_name, target_name, args):
@@ -66,7 +76,8 @@ def main(args):
 
     # run_LWF_model(save_name, 'mnist', 'svhn', args)
 
-    run_EWC_model(save_name, 'mnist', 'svhn', args)
+    args.epochs = 1
+    run_text_EWC_model(save_name, 'imdb', 'twitter', args)
 
 
 if __name__ == '__main__':

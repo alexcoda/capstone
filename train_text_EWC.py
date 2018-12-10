@@ -5,21 +5,23 @@ from torch.autograd import Variable
 from tqdm import tqdm
 import utils
 
-from model import EWCNet
+from text_model import TextEWCNet
 import numpy as np
 
 torch.manual_seed(0)
 
-def train_ewc(train_datasets, test_datasets, epochs_per_task=2,
+def train_text_ewc(train_datasets, test_datasets,
+          vocab_size,
+          epochs_per_task=5,
           batch_size=64, consolidate=False,
-          fisher_estimation_sample_size=1024,
-          lr=1e-3, weight_decay=1e-5, lamda=5000,
+          fisher_estimation_sample_size=2048,
+          lr=1e-3, weight_decay=1e-5, lamda=100000,
           cuda=False):
 
-    model = EWCNet(flatten=False)
+    
+    model = TextEWCNet(vocab_size)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr,
-                           weight_decay=weight_decay)
+    optimizer = optim.Adam(model.parameters())
 
     num_tasks = len(test_datasets)
     model.train()
@@ -35,12 +37,6 @@ def train_ewc(train_datasets, test_datasets, epochs_per_task=2,
             epoch_acc = 0
             for batch_index, (x, y) in data_stream:
 
-                if model.flatten:
-                    data_size = len(x)
-                    x = x.view(data_size, -1)
-                x = Variable(x).cuda() if cuda else Variable(x)
-                y = Variable(y).cuda() if cuda else Variable(y)
-
                 optimizer.zero_grad()
                 scores = model(x)
                 ce_loss = criterion(scores, y)
@@ -48,8 +44,10 @@ def train_ewc(train_datasets, test_datasets, epochs_per_task=2,
                 loss = ce_loss + ewc_loss
                 loss.backward()
                 optimizer.step()
-                _, predicted = scores.max(1)
-                precision = (predicted == y).sum().data.item() / len(x)
+
+                acc = binary_accuracy(scores, y)
+                epoch_loss += loss.item()
+                epoch_acc += acc
 
                 data_stream.set_description((
                     'task: {task}/{tasks} | '
@@ -69,19 +67,20 @@ def train_ewc(train_datasets, test_datasets, epochs_per_task=2,
                     loss=loss.data.item(),
                 ))
 
-                train_loss, train_acc = epoch_loss / len(data_loader), epoch_acc / len(data_loader)
+            train_loss, train_acc = epoch_loss / len(data_loader), epoch_acc / len(data_loader)
 
             test_losses = []
             test_accs = []
-            for i in range(0, task-1):
+            for i in range(0, num_tasks):
                 test_loss, test_acc = evaluate(model, test_datasets[i], criterion)
                 test_losses.append(test_loss)
                 test_accs.append(test_acc)
 
             test_losses = ", ".join([str(l) for l in test_losses])
             test_accs = "% ".join([str(v*100)[:4] for v in test_accs]) + "%"
-            print(f'| Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {test_losses} | Val. Acc: {test_accs} |')
+            print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {test_losses} | Val. Acc: {test_accs} |')
 
+        #model.reinit_embedding()
         if consolidate:
             model.consolidate(model.estimate_fisher(
                 data_loader, fisher_estimation_sample_size
@@ -104,6 +103,7 @@ def evaluate(model, iterator, criterion):
     epoch_acc = 0
     
     model.eval()
+    
     with torch.no_grad():
     
         for x,y in iterator:
