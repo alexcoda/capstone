@@ -196,5 +196,5 @@ def save_results(run_type, save_name, df, log_time=True):
     else:
         fname = f"{base_dir}{save_name}.csv"
 
-    plot_from_frames([df])
     df.to_csv(fname)
+    plot_from_frames([df], options={"pdf_name": fname})

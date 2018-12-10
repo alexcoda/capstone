@@ -5,6 +5,7 @@ from torch.autograd import Variable
 from tqdm import tqdm
 import utils
 
+import pandas as pd
 from text_model import TextEWCNet
 import numpy as np
 
@@ -12,20 +13,20 @@ torch.manual_seed(0)
 
 def train_text_ewc(train_datasets, test_datasets,
           vocab_size,
-          epochs_per_task=5,
+          args,
           batch_size=64, consolidate=False,
           fisher_estimation_sample_size=2048,
           lr=1e-3, weight_decay=1e-5, lamda=100000,
           cuda=False):
 
-    
+    epochs_per_task = args.epochs
     model = TextEWCNet(vocab_size)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters())
 
     num_tasks = len(test_datasets)
     model.train()
-    precs = []
+    df_utils = SavingUtils(["test_task_a", "test_task_b"])
 
     for task, data_loader in enumerate(train_datasets, 1):
         for epoch in range(1, epochs_per_task+1):
@@ -71,20 +72,22 @@ def train_text_ewc(train_datasets, test_datasets,
 
             test_losses = []
             test_accs = []
-            for i in range(0, num_tasks):
+            for i in range(0, task):
                 test_loss, test_acc = evaluate(model, test_datasets[i], criterion)
                 test_losses.append(test_loss)
                 test_accs.append(test_acc)
 
+            df_utils.add(test_accs)
             test_losses = ", ".join([str(l) for l in test_losses])
             test_accs = "% ".join([str(v*100)[:4] for v in test_accs]) + "%"
-            print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {test_losses} | Val. Acc: {test_accs} |')
+            print(f'| Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {test_losses} | Val. Acc: {test_accs} |')
 
-        #model.reinit_embedding()
         if consolidate:
             model.consolidate(model.estimate_fisher(
                 data_loader, fisher_estimation_sample_size
             ))
+
+    return df_utils.save()
 
 def binary_accuracy(preds, y):
     """
@@ -119,3 +122,27 @@ def evaluate(model, iterator, criterion):
             epoch_acc += acc
         
     return epoch_loss / len(iterator), epoch_acc / len(iterator)
+
+class SavingUtils():
+
+    def __init__(self, columns):
+        self.columns = columns
+        self.rows = []
+
+    def add(self, row):
+
+        if len(row)<len(self.columns):
+            addition = [0 for i in range(0, len(self.columns)-len(row))]
+            row += addition
+        self.rows.append(row)
+
+    def get(self):
+        return self.columns, self.rows
+
+    def save(self):
+        df = pd.DataFrame(self.rows, columns=self.columns)
+        return df
+
+
+
+

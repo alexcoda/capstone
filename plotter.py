@@ -6,31 +6,38 @@ import numpy as np
 import glob
 from matplotlib.font_manager import FontProperties
 import pandas as pd
+import math
 
 
 def get_arrays(df):
     
+
+    if "phase" in set(list(df)):
+        if df.loc[0].phase == -1.0:
+            plot_type = "da"
+        else:
+            plot_type = "lwf"
+    else:
+        plot_type = "ewc"
+
     headers = [name for name in list(df) if name[:4]=='test']
     num_tasks = len(headers)
     results_map = dd(list)
     for i, row in df.iterrows():
 
-        phase = int(row['phase'])
         for header in headers:
             value = row[header]
 
-            if np.isnan(value):
+            if ((np.isnan(value)) or (value<=0)):
                 results_map[header].append(-1)
             else:
                 results_map[header].append(value*100)
                 
     l = sorted([value for key, value in results_map.items()], reverse=True)
     
-    return [arr for arr in l] 
-            
-    return l
+    return plot_type, [arr for arr in l]
 
-def get_dist(l, num_tasks):
+def get_dist(l, num_tasks, plot_type):
     
     if num_tasks == 2:
         
@@ -41,7 +48,9 @@ def get_dist(l, num_tasks):
             else:
                 break
                 
-        
+        if plot_type == "da":
+            cpt = len(l[1])//2
+
         max_dist = max(cpt, len(l[1])-cpt)
         return [cpt], max_dist
     
@@ -66,8 +75,8 @@ def get_dist(l, num_tasks):
         return [cpt1, cpt2], max_dist
 
 
-def rearrange(arr, num_tasks, cpts, new_size):
-    
+def rearrange(arr, num_tasks, cpts, new_size, plot_type):
+
     if num_tasks == 2:
         
         cpt = cpts[0]
@@ -106,25 +115,26 @@ def resize(y, size):
 def values_from_frames(frames):
     
     all_lists = []
+    plot_types = []
     for df in frames:
-        l = get_arrays(df)
+        plot_type, l = get_arrays(df)
         all_lists.append(l)
+        plot_types.append(plot_type)
 
     max_size = 0
     num_tasks = len(l)
 
-    for l in all_lists:
-        cpts, max_dist = get_dist(l, num_tasks)
+    for plot_type, l in zip(plot_types, all_lists):
+        cpts, max_dist = get_dist(l, num_tasks, plot_type)
         max_size = max(max_size, max_dist)
 
-
     new_all_lists = []
-    for l in all_lists:
-        cpts, max_dist = get_dist(l, num_tasks)
+    for plot_type, l in zip(plot_types, all_lists):
+        cpts, max_dist = get_dist(l, num_tasks, plot_type)
 
         arrs = []
         for arr in l:
-            new_arr = rearrange(arr, num_tasks, cpts, max_size)
+            new_arr = rearrange(arr, num_tasks, cpts, max_size,  plot_type)
             arrs.append(new_arr)
         new_all_lists.append(arrs)
 
@@ -132,18 +142,29 @@ def values_from_frames(frames):
     for l in new_all_lists:
         for i in range(len(l)):
             arr = l[i]
-            arr = [(value if value>0 else -float("inf")) for value in arr]
+            arr = [(value if value>0 else -float(0)) for value in arr]
             arr = arr + [arr[-1]]
             values[i].append(arr)
     
-    return values, max_size, num_tasks
+    return values, max_size, num_tasks, plot_types
 
 
 def ax_plot(axs, k, first, value_arr, num_tasks, colors, 
             task_names, train_names, labels, y_range,
-            task_font, train_font, div):
-    
+            task_font, train_font, div, include_lwf, plot_types):
+
     for i, value in enumerate(value_arr):
+
+        plot_type = plot_types[i]
+        if plot_type == "lwf":
+            first_half, second_half = value[:(len(value)//2)+1], value[(len(value)//2)+1:]
+            half = (len(second_half)//2)
+            divs = (half+1, half) if len(second_half)%2 else (half, half)
+            fine, tune = second_half[:divs[0]], second_half[divs[1]:]
+            fine, tune = resize(fine, len(second_half)), resize(tune, len(second_half))
+            value = first_half + fine + tune
+            first = [i for i in range(0, len(value))]
+
         axs[k].plot(first,value,color=colors[i], label=labels[i])
         axs[k].get_xaxis().set_ticks([])
         
@@ -154,11 +175,15 @@ def ax_plot(axs, k, first, value_arr, num_tasks, colors,
         axs[k].set_position([box.x0, box.y0, box.width * 0.9, box.height])
  
     axs[k].set_ylim(y_range[0], y_range[1])
-    axs[k].set_xlim(0, num_tasks*div)
-    
-    #defining vertical lines
-    for i in range(1, num_tasks):
-        axs[k].axvline(x = i*div,linewidth=1, color='black', linestyle='--')
+
+    if not include_lwf:
+        axs[k].set_xlim(0, num_tasks*div)
+        for i in range(1, num_tasks):
+            axs[k].axvline(x = (i*div),linewidth=1, color='black', linestyle='--')
+    else:
+        axs[k].set_xlim(0, (num_tasks+1)*div)
+        for i in range(1, num_tasks+1):
+            axs[k].axvline(x = (i*div-1),linewidth=1, color='black', linestyle='--')
     
     #defining top labels (stages)
     if not k:
@@ -172,6 +197,11 @@ def ax_plot(axs, k, first, value_arr, num_tasks, colors,
             axs[k].set_title(spacing(num_tasks, 0, train_names[0]), loc='left', fontsize=train_font)
             axs[k].set_title(spacing(num_tasks, 1, train_names[1]), loc='center', fontsize=train_font)
             axs[k].set_title(spacing(num_tasks, 2, train_names[2]), loc='right', fontsize=train_font)
+
+        if include_lwf:
+            axs[k].set_title(spacing(num_tasks, 0, train_names[0]), loc='left', fontsize=train_font)
+            axs[k].set_title(spacing(num_tasks, 1, train_names[1]), loc='center', fontsize=train_font)
+            axs[k].set_title(spacing(num_tasks, 2, "Fine Tune"), loc='right', fontsize=train_font)
             
             
 def spacing(num_tasks, num, value):
@@ -188,8 +218,10 @@ def spacing(num_tasks, num, value):
 def plot_all(num_tasks, colors, indexes, values, 
              task_names=['Task A', 'Task B', 'Task C'], train_names=['Train A', 'Train B', 'Train C'], 
              labels=['DA', 'LWF'], y_range=(40, 100), pdf_name="image",
-             task_font=12, train_font=12, max_size=2, show=False):
-
+             task_font=12, train_font=12, max_size=2, show=False, include_lwf=False, plot_types=[]):
+    
+    if not plot_types:
+        raise Exception("No plot types added.")
     fig, axs = plt.subplots(num_tasks, 1, sharex=True)
     fig.subplots_adjust(hspace=0.2)
     title = 'Test'
@@ -199,7 +231,7 @@ def plot_all(num_tasks, colors, indexes, values,
         value_arr = values[k]
         ax_plot(axs, k, indexes, value_arr, num_tasks, colors, 
                 task_names, train_names, labels, y_range,
-                task_font, train_font, max_size)
+                task_font, train_font, max_size, include_lwf, plot_types)
         
     plt.savefig(pdf_name+'.pdf')
     
@@ -207,6 +239,8 @@ def plot_all(num_tasks, colors, indexes, values,
         plt.show()
 
 def parse_options(options):
+
+    print(options)
     
     if 'colors' not in options:
         options['colors'] = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'tab:purple']
@@ -239,7 +273,7 @@ def parse_options(options):
 
 def plot_from_frames(dfs, options={}):
     
-    values, max_size, num_tasks = values_from_frames(dfs)
+    values, max_size, num_tasks, plot_types = values_from_frames(dfs)
     indexes = [i for i in range(0, (num_tasks*max_size)+1)]
     options = parse_options(options)
     
@@ -253,11 +287,13 @@ def plot_from_frames(dfs, options={}):
     train_font = options['train_font']
     show = options['show']
 
+    include_lwf = "lwf" in set(plot_types)
+
     plot_all(num_tasks, colors, indexes, values, 
              task_names, train_names, labels, y_range, pdf_name,
-             task_font, train_font, max_size, show)
+             task_font, train_font, max_size, show, include_lwf, plot_types)
 
 def plot_from_csvs(names, options={}):
     
     dfs = [pd.read_csv(name) for name in names]
-    plot_from_frames(dfs)
+    plot_from_frames(dfs, options)

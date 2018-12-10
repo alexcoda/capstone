@@ -17,7 +17,9 @@ def run_text_EWC_model(save_name, source_name, target_name, args):
     train_loaders, test_loaders, vocab = get_text_dataloader(names, args)
     vocab_size = len(vocab)
 
-    train_text_ewc(train_loaders, test_loaders, vocab_size, epochs_per_task=args.epochs, consolidate=True)
+    results_df = train_text_ewc(train_loaders, test_loaders, vocab_size, args, consolidate=True)
+
+    save_results('ewc', save_name, results_df)
 
 def run_EWC_model(save_name, source_name, target_name, args):
 
@@ -30,7 +32,9 @@ def run_EWC_model(save_name, source_name, target_name, args):
     train_datasets = [train_source_loader, train_target_loader]
     test_datasets = [test_source_loader, test_target_loader]
 
-    train_ewc(train_datasets, test_datasets, epochs_per_task=args.epochs, consolidate=True)
+    results_df = train_ewc(train_datasets, test_datasets, args, consolidate=True)
+
+    save_results('ewc', save_name, results_df)
 
 
 def run_DA_model(save_name, source_name, target_name, args):
@@ -76,8 +80,10 @@ def main(args):
 
     # run_LWF_model(save_name, 'mnist', 'svhn', args)
 
-    args.epochs = 1
-    run_text_EWC_model(save_name, 'imdb', 'twitter', args)
+    #args.epochs = 1
+    #run_text_EWC_model(save_name, 'imdb', 'twitter', args)
+
+    run_EWC_model(save_name, 'mnist', 'svhn', args)
 
 
 if __name__ == '__main__':
