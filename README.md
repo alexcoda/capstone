@@ -1,5 +1,3 @@
-Some code adapted from/inspired by the following sources:
+Code for computer vision experiments from CMU MIIS Capstone
 
-https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
-
-https://github.com/ShangtongZhang/DeepRL
+Authors: Alex Coda; Gabriel Tinoco Kalejaiye; Pramati Kalwad; Varun Bharadhwaj
